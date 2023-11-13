@@ -1,0 +1,135 @@
+---
+title: "Reproducible Research Project 2"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Induction
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events.
+
+The followong analysis investigates Fatalities to:
+- Health (injuries and fatalities)
+- Properties and Crops (economic consequences)
+
+## 1. Across the United States, which types of events are most harmful with respect to population health?
+
+### Data Processing
+```{r}
+
+#importing library for plot
+library(ggplot2)
+Url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+#Downloading the Data
+download.file(Url,destfile = "storm_data.csv")
+storm_data<-read.csv("storm_data.csv")
+head(storm_data)
+```
+Exploring Columns
+```{r}
+colnames(storm_data)
+```
+Extracting Necessary columns
+```{r}
+
+storm_event<-storm_data[, c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+summary(storm_event)
+```
+5 Events that contributes to most injuries and Fatalities
+```{r}
+library(dplyr)
+Total_injuries<-storm_event %>% group_by(EVTYPE) %>% summarise(FATALITIES = sum(FATALITIES), 
+            INJURIES = sum(INJURIES), totals = sum(FATALITIES) + sum(INJURIES))
+
+Total_injuries<-Total_injuries[order(-Total_injuries$FATALITIES),]
+head(Total_injuries,5)
+```
+Reshaping The data for plots
+```{r}
+library(reshape)
+
+New_data<-as.data.frame(head(Total_injuries,5))
+#Reshaping the dataset for plot
+df<-melt(New_data, id.vars="EVTYPE")
+colnames(df)
+``` 
+### Results
+```{r}
+# Create chart
+ggplot(df,aes(x=reorder(EVTYPE,-value),y=value, fill=variable))+
+    geom_bar( stat = "identity",position="dodge")+ylab("Frequency Count")+ theme(plot.title = element_text(hjust = 0.5))+xlab("Event Type")+theme(axis.text.x = element_text(angle=45, hjust=1))+
+  ggtitle("Top 5 US Calamities") + theme(plot.title = element_text(hjust = 0.5))
+```
+- The bar chart clearly shows that tornadoes are the primary cause of injuries and fatalities resulting from natural disasters in the US.
+
+## 2. Which types of events have the greatest economic consequences in US?
+
+### Filtering DATA
+```{r}
+unique(storm_event$PROPDMGEXP)
+unique(storm_event$CROPDMGEXP)
+```
+```{r}
+# Map property damage alphanumeric exponents to numeric values.
+storm_event$PROPDMGEXP_number <-  recode(storm_event$PROPDMGEXP,
+                 " " = 10^0,
+                 "-" = 10^0, 
+                 "+" = 10^0,
+                 "0" = 10^0,
+                 "1" = 10^1,
+                 "2" = 10^2,
+                 "3" = 10^3,
+                 "4" = 10^4,
+                 "5" = 10^5,
+                 "6" = 10^6,
+                 "7" = 10^7,
+                 "8" = 10^8,
+                 "9" = 10^9,
+                 "H" = 10^2,
+                 "K" = 10^3,
+                 "M" = 10^6,
+                 "B" = 10^9,
+                 .default = 10^0)
+
+# Map crop damage alphanumeric exponents to numeric values
+storm_event$CROPDMGEXP_number <-  recode(storm_event$CROPDMGEXP,
+                                  " " = 10^0,
+                                  "?" = 10^0, 
+                                  "0" = 10^0,
+                                  "K" = 10^3,
+                                  "M" = 10^6,
+                                  "B" = 10^9,
+                                  .default = 10^0)
+
+#Cost of Damaged Property and Crop 
+storm_event$PropCost<-storm_event$PROPDMG * storm_event$PROPDMGEXP_number
+storm_event$CropCost<-storm_event$CROPDMG * storm_event$CROPDMGEXP_number
+```
+Preparing Dataset for plotting
+```{r}
+TotalCost<-storm_event %>% group_by(EVTYPE) %>% summarise(PropCost = sum(PropCost), 
+            CropCost = sum(CropCost), total_cost = sum(PropCost) + sum(CropCost))
+
+TotalCost<-TotalCost[order(-TotalCost$total_cost),]
+```
+```{r}
+New_cost<-as.data.frame(head(TotalCost,5))
+df_cost<-melt(New_cost, id.vars="EVTYPE")
+colnames(df_cost)
+```
+### Results
+```{r}
+ggplot(df_cost,aes(x=reorder(EVTYPE,-value),y=value, fill=variable))+
+    geom_bar( stat = "identity",position="dodge")+ylab("Frequency Count")+ theme(plot.title = element_text(hjust = 0.5))+xlab("Event Type")+theme(axis.text.x = element_text(angle=45, hjust=1)) + ggtitle("Top 5 US Storm Events causing Economic Consequences")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+-In the United States, floods cause the most financial damage from natural disasters, with hurricanes or typhoons coming in a close second.
